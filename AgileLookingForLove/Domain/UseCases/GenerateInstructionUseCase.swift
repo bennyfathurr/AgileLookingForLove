@@ -14,9 +14,10 @@ final class GenerateInstructionUseCase {
         self.repository = repository
     }
     
-    func execute() -> GameInstruction {
-        let instruction = GameInstruction.random()
+    func execute(availableKinds: [ShapeKind]) -> GameInstruction {
+        let instruction = GameInstruction.generate(from: availableKinds)
         repository.updateInstructions(instruction)
         return instruction
     }
+
 }

@@ -12,7 +12,7 @@ final class SpawnSystem: System {
     static let query = EntityQuery(where: .has(ShapeComponent.self))
     
     private var spawnTimer: Double = 0.0
-    private let spawnInterval: Double = 3.0
+    private let spawnInterval: Double = 5.0
     private let maxEnties = 6
     
     required init(scene: Scene) {}

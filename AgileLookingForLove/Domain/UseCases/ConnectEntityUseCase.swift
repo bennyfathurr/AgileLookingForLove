@@ -15,10 +15,19 @@ final class ConnectEntityUseCase {
     }
     
     func execute(fromShape: ShapeKind, toShape: ShapeKind) -> Bool {
-        guard let instruction = repository.currentInstructions else { return false }
+        print("[ConnectEntityUseCase] execute called with fromShape: \(fromShape), toShape: \(toShape)")
+        guard let instruction = repository.currentInstructions else {
+            print("[ConnectEntityUseCase] repository.currentInstructions is NIL!")
+            return false
+        }
+        print("[ConnectEntityUseCase] Comparing with instruction: from=\(instruction.formShape), to=\(instruction.toShape)")
         let isValid = (fromShape == instruction.formShape && toShape == instruction.toShape)
                            || (fromShape == instruction.toShape && toShape == instruction.formShape)
-                if isValid { repository.addScore(100) }
-                return isValid
+        print("[ConnectEntityUseCase] Comparison result: \(isValid)")
+        if isValid {
+            repository.addScore(100)
+            print("[ConnectEntityUseCase] Score added! New score: \(repository.score)")
+        }
+        return isValid
     }
 }

@@ -68,23 +68,23 @@ final class RedThreadValidationSystem: System {
             let shapes = context.entities(matching: Self.shapeQuery, updatingSystemWhen: .rendering)
             var startEntity: Entity? = nil
             var endEntity:   Entity? = nil
-            var minStartDist: Float = 0.50   // max jarak 50cm dari ujung stroke
-            var minEndDist:   Float = 0.50
+            var minStartDist: Float = 0.80   // max jarak 80cm dari ujung stroke
+            var minEndDist:   Float = 0.80
             
             let shapeArray = Array(shapes)
             print("[RedThreadValidationSystem] Found \(shapeArray.count) shapes in scene.")
             
             for shape in shapeArray {
                 guard let stateComp = shape.components[EntityStateComponent.self] else { continue }
-                print("[RedThreadValidationSystem] Shape: \(shape.name), State: \(stateComp.state), Position: \(shape.position(relativeTo: nil))")
                 
                 guard stateComp.state == .stunned else { continue }
                 
-                let pos    = shape.position(relativeTo: nil)
-                let dStart = simd_distance(pos, startPoint)
-                let dEnd   = simd_distance(pos, endPoint)
+                // Use the visual center of the shape (visual bounds center in world space)
+                let visualCenter = shape.visualBounds(relativeTo: nil).center
+                let dStart = simd_distance(visualCenter, startPoint)
+                let dEnd   = simd_distance(visualCenter, endPoint)
                 
-                print("[RedThreadValidationSystem] -> Distance to \(shape.name): Start=\(dStart)m, End=\(dEnd)m")
+                print("[RedThreadValidationSystem] Shape: \(shape.name), Position: \(shape.position(relativeTo: nil)), VisualCenter: \(visualCenter), StartDist=\(dStart)m, EndDist=\(dEnd)m")
                 
                 if dStart < minStartDist {
                     minStartDist = dStart

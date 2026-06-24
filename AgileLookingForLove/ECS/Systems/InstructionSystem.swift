@@ -25,6 +25,10 @@ final class InstructionSystem: System {
                     stateComp.stunTimer = 0
                     // Reset visual
                     resetEntityVisual(entity)
+                    // Resume walk animation
+                    if let animation = entity.availableAnimations.first {
+                        entity.playAnimation(animation.repeat(duration: .infinity), transitionDuration: 0.5)
+                    }
                 }
                 entity.components[EntityStateComponent.self] = stateComp
             }
@@ -32,10 +36,7 @@ final class InstructionSystem: System {
     }
     
     private func resetEntityVisual(_ entity: Entity) {
-        guard let shapeComp = entity.components[ShapeComponent.self],
-              var model = entity.components[ModelComponent.self] else { return }
-        model.materials = [SimpleMaterial(color: colorFor(shapeComp.kind), isMetallic: true)]
-        entity.components[ModelComponent.self] = model
+        entity.setStatusIndicator(color: nil)
     }
     
     private func colorFor(_ kind: ShapeKind) -> UIColor {

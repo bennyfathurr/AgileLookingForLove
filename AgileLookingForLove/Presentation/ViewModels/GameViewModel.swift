@@ -10,6 +10,7 @@ import RealityKit
 import Observation
 import UIKit
 import _RealityKit_SwiftUI
+import RealityKitContent
 
 @Observable
 @MainActor
@@ -36,6 +37,27 @@ final class GameViewModel {
     var firstSelectedEntity: Entity?
     private var canvasEntity: Entity?
     
+    private var activeEntities: [Entity] = []
+    private let maxEntitiesCount: Int = 8
+    
+    var shapeTemplates: [ShapeKind: Entity] = [:]
+    
+    func loadTemplates() async {
+        do {
+            let sphereTemplate = try await Entity(named: "bundar_walk_anim 2", in: realityKitContentBundle)
+            let cubeTemplate = try await Entity(named: "kotak_walk_anim", in: realityKitContentBundle)
+            let pyramidTemplate = try await Entity(named: "segitiga_walk_anim", in: realityKitContentBundle)
+            
+            shapeTemplates[.sphere] = sphereTemplate
+            shapeTemplates[.cube] = cubeTemplate
+            shapeTemplates[.pyramid] = pyramidTemplate
+            
+            print("[GameViewModel] Templates loaded successfully!")
+        } catch {
+            print("[GameViewModel] Error loading templates: \(error)")
+        }
+    }
+    
     init(
         repository: GameStateRepository,
         generateInstruction: GenerateInstructionUseCase,
@@ -60,10 +82,17 @@ final class GameViewModel {
     
     func setContent(_ content: RealityViewContent) {
         self.content = content
+        for entity in activeEntities {
+            content.add(entity)
+        }
     }
     
     func refreshInstruction() {
-        currentInstruction = generateInstruction.execute()
+        // Collect all distinct shape kinds currently active in the room
+        let kinds = activeEntities.compactMap { $0.components[ShapeComponent.self]?.kind }
+        let uniqueKinds = Array(Set(kinds))
+        
+        currentInstruction = generateInstruction.execute(availableKinds: uniqueKinds)
         instructionTimer = currentInstruction?.timeLimit ?? 10
     }
     
@@ -72,7 +101,7 @@ final class GameViewModel {
         score = repository.score
         if instructionTimer <= 0 { refreshInstruction() }
     }
-    
+
     func handleShoot(entity: Entity) {
         guard var stateComp = entity.components[EntityStateComponent.self],
               (stateComp.state == .idle || stateComp.state == .walking) else { return }
@@ -83,10 +112,10 @@ final class GameViewModel {
         entity.components[EntityStateComponent.self] = stateComp
 
         // Visual feedback: entity jadi merah
-        if var model = entity.components[ModelComponent.self] {
-            model.materials = [SimpleMaterial(color: .red, isMetallic: true)]
-            entity.components[ModelComponent.self] = model
-        }
+        entity.setStatusIndicator(color: .red)
+        
+        // Stop animations when stunned
+        entity.stopAllAnimations(recursive: true)
     }
 
     
@@ -134,22 +163,42 @@ final class GameViewModel {
     }
     
     func spawnEntity(in content: RealityViewContent) {
-        let kind = ShapeKind.allCases.randomElement()!
-        let mesh = kind.meshResource
-        let color = colorFor(kind)
-        let material = SimpleMaterial(color: color, isMetallic: true)
+        // Enforce the max entity count limit
+        guard activeEntities.count < maxEntitiesCount else {
+            print("[Spawning] Maximum character limit reached (\(maxEntitiesCount)). Skipping spawn.")
+            return
+        }
         
-        let entity = ModelEntity(mesh: mesh, materials: [material])
-        entity.generateCollisionShapes(recursive: false)
+        let kind = ShapeKind.allCases.randomElement()!
+        
+        let entity: Entity
+        if let template = shapeTemplates[kind] {
+            entity = template.clone(recursive: true)
+            
+            let bounds = entity.visualBounds(relativeTo: entity)
+            let extents = bounds.extents
+            let center = bounds.center
+            
+            let boxShape = ShapeResource.generateBox(width: extents.x, height: extents.y, depth: extents.z)
+                .offsetBy(translation: center)
+            entity.components.set(CollisionComponent(shapes: [boxShape]))
+        } else {
+            let mesh = kind.meshResource
+            let color = colorFor(kind)
+            let material = SimpleMaterial(color: color, isMetallic: true)
+            let modelEntity = ModelEntity(mesh: mesh, materials: [material])
+            modelEntity.generateCollisionShapes(recursive: false)
+            entity = modelEntity
+        }
+        
         entity.components.set(InputTargetComponent())
         
-        // Random posisi di sekitar player (within the 4.0m radial boundary)
-        let x = Float.random(in: -2.0...2.0)
-        let y = Float.random(in: 0.5...1.5)
-        let z = Float.random(in: -2.5 ... -0.8)
+        // Random posisi di sekitar player
+        let x = Float.random(in: -1.2...1.2)
+        let y = Float.random(in: 0.4...0.8)
+        let z = Float.random(in: -1.8 ... -1.0)
         entity.position = SIMD3(x, y, z)
         
-        // Add dynamic PhysicsBodyComponent so they fall and land on real surfaces
         let physicsBody = PhysicsBodyComponent(
             massProperties: .init(mass: 0.1),
             material: .default,
@@ -157,12 +206,18 @@ final class GameViewModel {
         )
         entity.components.set(physicsBody)
         
-        // Tambah ECS Components
+        if let animation = entity.availableAnimations.first {
+            entity.playAnimation(animation.repeat(duration: .infinity), transitionDuration: 0.5)
+        }
+        
         entity.components[ShapeComponent.self] = ShapeComponent(kind: kind)
         entity.components[EntityStateComponent.self] = EntityStateComponent()
         
+        // Track the entity locally and add it to the scene
+        activeEntities.append(entity)
         content.add(entity)
     }
+
 
     func spawnEntity() {
         guard let content = self.content else { return }
@@ -222,7 +277,7 @@ final class GameViewModel {
     func handleThreadStroke(entityA: Entity, entityB: Entity, strokeEntity: Entity?) {
         guard let shapeA = entityA.components[ShapeComponent.self],
               let shapeB = entityB.components[ShapeComponent.self] else {
-            print("[Connection] ❌ Entity tidak punya ShapeComponent")
+            print("[Connection] Entity tidak punya ShapeComponent")
             strokeEntity?.removeFromParent()
             return
         }
@@ -233,15 +288,16 @@ final class GameViewModel {
         )
 
         if isValid {
-            // ✅ VALID
+            // VALID
             connectionResult = .valid(fromShape: shapeA.kind, toShape: shapeB.kind)
-            lastConnectionMessage = "✅ BENAR! \(shapeA.kind.displaySymbol) → \(shapeB.kind.displaySymbol) +100"
+            lastConnectionMessage = "BENAR! \(shapeA.kind.displaySymbol) → \(shapeB.kind.displaySymbol) +100"
             score = repository.score
 
             markConnected(entityA)
             markConnected(entityB)
+            
+            activeEntities.removeAll(where: {$0 == entityA || $0 == entityB})
 
-            // Visual: entity jadi hijau (sudah connected)
             setColor(.systemGreen, on: entityA)
             setColor(.systemGreen, on: entityB)
 
@@ -266,7 +322,7 @@ final class GameViewModel {
                 entityB.removeFromParent()
             }
 
-            print("[Connection] ✅ VALID: \(shapeA.kind) → \(shapeB.kind) | Score: \(score)")
+            print("[Connection] VALID: \(shapeA.kind) → \(shapeB.kind) | Score: \(score)")
 
             // Auto clear result message setelah 2 detik
             Task {
@@ -276,17 +332,16 @@ final class GameViewModel {
             }
 
         } else {
-            // ❌ INVALID
+            // INVALID
             let instruction = currentInstruction?.description ?? "?"
             connectionResult = .invalid(fromShape: shapeA.kind, toShape: shapeB.kind)
-            lastConnectionMessage = "❌ SALAH! \(shapeA.kind.displaySymbol) → \(shapeB.kind.displaySymbol) | Instruksi: \(instruction)"
+            lastConnectionMessage = "SALAH! \(shapeA.kind.displaySymbol) → \(shapeB.kind.displaySymbol) | Instruksi: \(instruction)"
 
-            print("[Connection] ❌ INVALID: \(shapeA.kind) → \(shapeB.kind) | Instruksi: \(instruction)")
+            print("[Connection] INVALID: \(shapeA.kind) → \(shapeB.kind) | Instruksi: \(instruction)")
 
             // Remove the invalid connection line immediately
             strokeEntity?.removeFromParent()
 
-            // Visual: entity balik ke merah (tetap stunned)
             setColor(.red, on: entityA)
             setColor(.red, on: entityB)
 
@@ -299,10 +354,6 @@ final class GameViewModel {
     }
     
     private func setColor(_ color: UIColor, on entity: Entity) {
-        if var model = entity.components[ModelComponent.self] {
-            model.materials = [SimpleMaterial(color: color, isMetallic: true)]
-            entity.components[ModelComponent.self] = model
-        }
+        entity.setStatusIndicator(color: color)
     }
-
 }

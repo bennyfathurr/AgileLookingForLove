@@ -48,6 +48,12 @@ final class MovementSystem: System {
                     stateComp.direction = toOrigin
                 }
                 
+                // Rotate the entity to face its walking direction on the XZ plane
+                if stateComp.direction.x != 0 || stateComp.direction.z != 0 {
+                    let angle = atan2(stateComp.direction.x, stateComp.direction.z)
+                    entity.orientation = simd_quatf(angle: angle, axis: SIMD3<Float>(0, 1, 0))
+                }
+                
                 let speed: Float = 0.2 // 20 cm/s
                 var motion = entity.components[PhysicsMotionComponent.self] ?? PhysicsMotionComponent()
                 

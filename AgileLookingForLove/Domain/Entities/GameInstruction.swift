@@ -14,11 +14,18 @@ struct GameInstruction: Sendable {
         "Sambung to \(formShape.displaySymbol) -> \(toShape.displaySymbol)"
     }
     
-    static func random() -> GameInstruction {
-        let shapes = ShapeKind.allCases
-        let form = shapes.randomElement()!
-        var to = shapes.randomElement()!
-        while to == form { to = shapes.randomElement()!}
+    static func generate(from availableKinds: [ShapeKind]) -> GameInstruction {
+        let kinds = availableKinds.count >= 2 ? availableKinds : ShapeKind.allCases
+        
+        let form = kinds.randomElement()!
+        var to = kinds.randomElement()!
+        while to == form && kinds.count > 1 {
+            to = kinds.randomElement()!
+        }
         return GameInstruction(formShape: form, toShape: to, timeLimit: Double.random(in: 12...25))
+    }
+        
+    static func random() -> GameInstruction {
+        return generate(from: ShapeKind.allCases)
     }
 }

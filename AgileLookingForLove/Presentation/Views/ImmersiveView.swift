@@ -27,6 +27,7 @@ struct ImmersiveView: View {
             ShapeComponent.registerComponent()
             EntityStateComponent.registerComponent()
             ThreadAnchorComponent.registerComponent()
+            OriginalMaterialsComponent.registerComponent()
             RedThreadValidationSystem.registerSystem()
             
             //ILDraw Package
@@ -66,7 +67,15 @@ struct ImmersiveView: View {
             content.add(fallbackFloor)
             
             appModel.viewModel.setContent(content)
-            for _ in 0..<4 {appModel.viewModel.spawnEntity(in: content)}
+            
+            // Load templates and spawn initial entities once templates are ready
+            Task {
+                await appModel.viewModel.loadTemplates()
+                try? await Task.sleep(nanoseconds: 5_000_000_000)
+                for _ in 0..<4 {
+                    appModel.viewModel.spawnEntity()
+                }
+            }
             
             // Start plane detection to find and spawn floor
             Task {
@@ -81,7 +90,7 @@ struct ImmersiveView: View {
             // UI
             let headAnchor = AnchorEntity(.head)
             if let hudEntity = attachments.entity(for: "HUDOverlay") {
-                hudEntity.position = SIMD3<Float>(0, 0.20, -0.7)
+                hudEntity.position = SIMD3<Float>(0, 0.10, -0.7)
                 headAnchor.addChild(hudEntity)
             }
             content.add(headAnchor)
