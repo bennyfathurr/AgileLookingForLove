@@ -11,6 +11,18 @@
       }
     ]
   },
+  "2B9A602B-1352-40C6-A7C9-41C349347ABD" : {
+    "objectMetadataList" : [
+      [
+        "2B9A602B-1352-40C6-A7C9-41C349347ABD",
+        "Root"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      }
+    ]
+  },
   "65F6F990-A780-4474-B78B-572E0E4E273D" : {
     "objectMetadataList" : [
       [
@@ -40,44 +52,7 @@
       [
         "ACEEA3BC-0AAA-4DE3-B49B-FFA37FE468DB",
         "root",
-        "Walk",
-        "Track2"
-      ],
-      {
-        "isExpanded" : true,
-        "isLocked" : false
-      },
-      [
-        "ACEEA3BC-0AAA-4DE3-B49B-FFA37FE468DB",
-        "root",
         "Walk"
-      ],
-      {
-        "isExpanded" : true,
-        "isLocked" : false
-      },
-      [
-        "ACEEA3BC-0AAA-4DE3-B49B-FFA37FE468DB",
-        "root",
-        "rig_kotak"
-      ],
-      {
-        "isExpanded" : true,
-        "isLocked" : false
-      },
-      [
-        "ACEEA3BC-0AAA-4DE3-B49B-FFA37FE468DB",
-        "root"
-      ],
-      {
-        "isExpanded" : true,
-        "isLocked" : false
-      },
-      [
-        "ACEEA3BC-0AAA-4DE3-B49B-FFA37FE468DB",
-        "root",
-        "rig_kotak",
-        "Kotak"
       ],
       {
         "isExpanded" : true,
@@ -94,9 +69,7 @@
       },
       [
         "ACEEA3BC-0AAA-4DE3-B49B-FFA37FE468DB",
-        "root",
-        "rig_kotak",
-        "rig_kotak"
+        "root"
       ],
       {
         "isExpanded" : true,
@@ -111,6 +84,45 @@
       {
         "isExpanded" : true,
         "isLocked" : false
+      },
+      [
+        "ACEEA3BC-0AAA-4DE3-B49B-FFA37FE468DB",
+        "root",
+        "Walk",
+        "Track2"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "ACEEA3BC-0AAA-4DE3-B49B-FFA37FE468DB",
+        "root",
+        "rig_kotak"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "ACEEA3BC-0AAA-4DE3-B49B-FFA37FE468DB",
+        "root",
+        "rig_kotak",
+        "rig_kotak"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "ACEEA3BC-0AAA-4DE3-B49B-FFA37FE468DB",
+        "root",
+        "rig_kotak",
+        "Kotak"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
       }
     ]
   },
@@ -119,7 +131,24 @@
       [
         "AF09ED6F-1707-48FD-8720-65B998362C09",
         "Root",
+        "Sphere_Left"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "AF09ED6F-1707-48FD-8720-65B998362C09",
+        "Root",
         "GridMaterial"
+      ],
+      {
+        "isExpanded" : true,
+        "isLocked" : false
+      },
+      [
+        "AF09ED6F-1707-48FD-8720-65B998362C09",
+        "Root"
       ],
       {
         "isExpanded" : true,
@@ -133,23 +162,6 @@
       {
         "isExpanded" : true,
         "isLocked" : false
-      },
-      [
-        "AF09ED6F-1707-48FD-8720-65B998362C09",
-        "Root"
-      ],
-      {
-        "isExpanded" : true,
-        "isLocked" : false
-      },
-      [
-        "AF09ED6F-1707-48FD-8720-65B998362C09",
-        "Root",
-        "Sphere_Left"
-      ],
-      {
-        "isExpanded" : true,
-        "isLocked" : false
       }
     ]
   },
@@ -157,8 +169,7 @@
     "objectMetadataList" : [
       [
         "CB766F92-EE55-4A63-9401-E7B8C009764D",
-        "Root",
-        "GridMaterial"
+        "Root"
       ],
       {
         "isExpanded" : true,
@@ -166,7 +177,8 @@
       },
       [
         "CB766F92-EE55-4A63-9401-E7B8C009764D",
-        "Root"
+        "Root",
+        "GridMaterial"
       ],
       {
         "isExpanded" : true,
@@ -224,9 +236,7 @@
       },
       [
         "FA847D6C-20D0-45C9-B790-10C2D043E960",
-        "root",
-        "rig_bundar",
-        "Bundar"
+        "root"
       ],
       {
         "isExpanded" : true,
@@ -243,7 +253,9 @@
       },
       [
         "FA847D6C-20D0-45C9-B790-10C2D043E960",
-        "root"
+        "root",
+        "rig_bundar",
+        "Bundar"
       ],
       {
         "isExpanded" : true,
