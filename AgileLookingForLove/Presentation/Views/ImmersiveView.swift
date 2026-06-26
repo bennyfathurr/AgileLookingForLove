@@ -77,6 +77,7 @@ struct ImmersiveView: View {
             content.add(fallbackFloor)
             
             appModel.viewModel.setContent(content)
+            appModel.viewModel.setupPlacementIndicator()
             
             // Root entity for asynchronously loaded items (bypasses inout capture restriction)
             let sceneRoot = Entity()
@@ -152,6 +153,16 @@ struct ImmersiveView: View {
                     
                     if stateComp?.state == .idle || stateComp?.state == .walking {
                         appModel.viewModel.handleShoot(entity: entity)
+                    }
+                }
+        )
+        .gesture(
+            DragGesture()
+                .targetedToAnyEntity()
+                .onChanged { value in
+                    if value.entity.name == "PlacementIndicator" {
+                        let parent = value.entity.parent ?? value.entity
+                        value.entity.position = value.convert(value.location3D, from: .local, to: parent)
                     }
                 }
         )

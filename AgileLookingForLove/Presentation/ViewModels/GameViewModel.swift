@@ -37,6 +37,10 @@ final class GameViewModel {
     var firstSelectedEntity: Entity?
     private var canvasEntity: Entity?
     
+    // Environment placement properties
+    var environmentEntity: Entity?
+    var placementIndicator: Entity?
+    
     private var activeEntities: [Entity] = []
     private let maxEntitiesCount: Int = 8
     
@@ -195,11 +199,18 @@ final class GameViewModel {
         
         entity.components.set(InputTargetComponent())
         
-        // Random posisi di sekitar player
-        let x = Float.random(in: -1.2...1.2)
-        let y = Float.random(in: 0.4...0.8)
-        let z = Float.random(in: -1.8 ... -1.0)
-        entity.position = SIMD3(x, y, z)
+        // Position relative to environment if present, otherwise default to player surroundings
+        if let env = environmentEntity {
+            let envPos = env.position
+            let xOffset = Float.random(in: -1.0...1.0)
+            let zOffset = Float.random(in: -1.0...1.0)
+            entity.position = SIMD3<Float>(envPos.x + xOffset, envPos.y + 0.5, envPos.z + zOffset)
+        } else {
+            let x = Float.random(in: -1.2...1.2)
+            let y = Float.random(in: 0.4...0.8)
+            let z = Float.random(in: -1.8 ... -1.0)
+            entity.position = SIMD3(x, y, z)
+        }
         
         let physicsBody = PhysicsBodyComponent(
             massProperties: .init(mass: 0.1),
@@ -357,5 +368,61 @@ final class GameViewModel {
     
     private func setColor(_ color: UIColor, on entity: Entity) {
         entity.setStatusIndicator(color: color)
+    }
+    
+    func setupPlacementIndicator() {
+        guard self.placementIndicator == nil, let content = self.content else { return }
+        
+        let indicator = ModelEntity(
+            mesh: .generateSphere(radius: 0.15),
+            materials: [SimpleMaterial(color: UIColor.systemGreen.withAlphaComponent(0.5), isMetallic: false)]
+        )
+        indicator.name = "PlacementIndicator"
+        indicator.position = SIMD3<Float>(0, 0, -1.5)
+        
+        // Enable collision and input target for drag gesture
+        indicator.components.set(InputTargetComponent())
+        indicator.generateCollisionShapes(recursive: false)
+        
+        self.placementIndicator = indicator
+        content.add(indicator)
+        print("[GameViewModel] Placement indicator spawned!")
+    }
+    
+    func createEnvironment() {
+        guard let content = self.content, let indicator = self.placementIndicator else {
+            print("[GameViewModel] Cannot create environment: content or indicator is nil")
+            return
+        }
+        
+        let indicatorPosition = indicator.position
+        
+        Task {
+            do {
+                // Load envi.usdc from bundle (under Meshes/envi.usdc)
+                let environment = try await Entity(named: "Meshes/envi", in: realityKitContentBundle)
+                environment.name = "Environment"
+                environment.position = indicatorPosition
+                
+                // Setup physics and collisions recursively
+                environment.generateCollisionShapes(recursive: true)
+                environment.components.set(PhysicsBodyComponent(mode: .static))
+                
+                content.add(environment)
+                self.environmentEntity = environment
+                
+                // Hide and disable placement indicator
+                indicator.isEnabled = false
+                
+                print("[GameViewModel] Environment created successfully at \(indicatorPosition)!")
+                
+                // Spawn initial minions on top of the environment
+                for _ in 0..<4 {
+                    spawnEntity()
+                }
+            } catch {
+                print("[GameViewModel] Failed to load environment: \(error)")
+            }
+        }
     }
 }

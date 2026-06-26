@@ -197,6 +197,8 @@ public struct CustomPinchGestureSystem: System {
         let projectiles = context.entities(matching: projectileQuery, updatingSystemWhen: .rendering)
         let deltaTime = Float(context.deltaTime)
         
+        var cachedShapes: QueryResult<Entity>? = nil
+        
         for projectile in projectiles {
             guard var projComp = projectile.components[LoveProjectileComponent.self] else { continue }
             
@@ -205,41 +207,49 @@ public struct CustomPinchGestureSystem: System {
             projComp.distanceTraveled += simd_length(movement)
             
             var hitTarget = false
-            let shapesQuery = EntityQuery(where: .has(ShapeComponent.self) && .has(EntityStateComponent.self))
-            let shapes = context.entities(matching: shapesQuery, updatingSystemWhen: .rendering)
             
-            for shape in shapes {
-                guard let stateComp = shape.components[EntityStateComponent.self],
-                      (stateComp.state == .idle || stateComp.state == .walking) else { continue }
-                
-                let shapePos = shape.position(relativeTo: nil as Entity?)
-                let dist = simd_distance(projectile.position, shapePos)
-                
-                // Stun triggered exactly when the projectile arrives at the shape (0.4m radius)
-                if dist < 0.4 {
-                    var mutableStateComp = stateComp
-                    mutableStateComp.state = .stunned
-                    mutableStateComp.stunTimer = 5.0
-                    shape.components[EntityStateComponent.self] = mutableStateComp
+            let activeShapes: QueryResult<Entity>
+            if let cached = cachedShapes {
+                activeShapes = cached
+            } else {
+                let shapesQuery = EntityQuery(where: .has(ShapeComponent.self) && .has(EntityStateComponent.self))
+                let evaluated = context.entities(matching: shapesQuery, updatingSystemWhen: .rendering)
+                cachedShapes = evaluated
+                activeShapes = evaluated
+            }
+            
+            for shape in activeShapes {
+                    guard let stateComp = shape.components[EntityStateComponent.self],
+                          (stateComp.state == .idle || stateComp.state == .walking) else { continue }
                     
-                    // Efek visual stun
-                    NotificationCenter.default.post(
-                        name: .stunEntityRequested,
-                        object: nil,
-                        userInfo: ["entity": shape]
-                    )
+                    let shapePos = shape.position(relativeTo: nil as Entity?)
+                    let dist = simd_distance(projectile.position, shapePos)
                     
-                    hitTarget = true
-                    break
+                    // Stun triggered exactly when the projectile arrives at the shape (0.4m radius)
+                    if dist < 0.4 {
+                        var mutableStateComp = stateComp
+                        mutableStateComp.state = .stunned
+                        mutableStateComp.stunTimer = 5.0
+                        shape.components[EntityStateComponent.self] = mutableStateComp
+                        
+                        // Efek visual stun
+                        NotificationCenter.default.post(
+                            name: .stunEntityRequested,
+                            object: nil,
+                            userInfo: ["entity": shape]
+                        )
+                        
+                        hitTarget = true
+                        break
+                    }
+                }
+                
+                if hitTarget || projComp.distanceTraveled >= projComp.maxDistance {
+                    projectile.removeFromParent()
+                } else {
+                    projectile.components.set(projComp)
                 }
             }
-            
-            if hitTarget || projComp.distanceTraveled >= projComp.maxDistance {
-                projectile.removeFromParent()
-            } else {
-                projectile.components.set(projComp)
-            }
-        }
     }
     
     /// Compute quaternion that rotates vector `from` to vector `to`

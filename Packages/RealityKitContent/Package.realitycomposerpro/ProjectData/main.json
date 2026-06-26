@@ -4,20 +4,26 @@
     "\/RealityKitContent\/Sources\/RealityKitContent\/RealityKitContent.rkassets\/Immersive.usda" : "65F6F990-A780-4474-B78B-572E0E4E273D",
     "\/RealityKitContent\/Sources\/RealityKitContent\/RealityKitContent.rkassets\/Scene.usda" : "0A9B4653-B11E-4D6A-850E-C6FCB621626C",
     "\/RealityKitContent\/Sources\/RealityKitContent\/RealityKitContent.rkassets\/Untitled Scene.usda" : "D560BB77-AAF3-4BDE-B7C4-989332A4688B",
-    "\/RealityKitContent\/Sources\/RealityKitContent\/RealityKitContent.rkassets\/Untitled%20Scene.usda" : "2B9A602B-1352-40C6-A7C9-41C349347ABD",
+    "RealityKitContent\/Sources\/RealityKitContent\/RealityKitContent.rkassets\/Animation\/bundar_walk_anim 2.usdc" : "1C18DED1-EF25-4103-AAA8-FF9B0BFA34C7",
+    "RealityKitContent\/Sources\/RealityKitContent\/RealityKitContent.rkassets\/Animation\/kotak_walk_anim.usdc" : "F6AC1292-9483-4045-8A8B-1E3F692C8028",
+    "RealityKitContent\/Sources\/RealityKitContent\/RealityKitContent.rkassets\/Animation\/segitiga_walk_anim.usdc" : "26FF1BF2-03B4-4D76-9BC4-5E8F460CD99A",
     "RealityKitContent\/Sources\/RealityKitContent\/RealityKitContent.rkassets\/GridMaterial.usda" : "66168B71-AB05-424E-8B6C-D33D6E61B08F",
     "RealityKitContent\/Sources\/RealityKitContent\/RealityKitContent.rkassets\/Immersive.usda" : "AF09ED6F-1707-48FD-8720-65B998362C09",
-    "RealityKitContent\/Sources\/RealityKitContent\/RealityKitContent.rkassets\/Love Shot.usda" : "EC3A13D7-86C9-4298-8EAC-4F34A25FA55C",
+    "RealityKitContent\/Sources\/RealityKitContent\/RealityKitContent.rkassets\/Love Shot.usda" : "73625D31-1A48-498A-998B-A413E0F4A7AC",
+    "RealityKitContent\/Sources\/RealityKitContent\/RealityKitContent.rkassets\/Meshes\/envi.usdc" : "617C14F0-4E91-40ED-84D3-0FE49199CE97",
     "RealityKitContent\/Sources\/RealityKitContent\/RealityKitContent.rkassets\/Scene.usda" : "D66134B1-3681-4A8E-AFE5-29F257229F3B",
     "RealityKitContent\/Sources\/RealityKitContent\/RealityKitContent.rkassets\/bundar_walk_anim.usdc" : "FA847D6C-20D0-45C9-B790-10C2D043E960",
     "RealityKitContent\/Sources\/RealityKitContent\/RealityKitContent.rkassets\/kotak_walk_anim.usdc" : "ACEEA3BC-0AAA-4DE3-B49B-FFA37FE468DB"
   },
   "projectID" : 1080368479148279939,
   "uuidToIntID" : {
-    "2B9A602B-1352-40C6-A7C9-41C349347ABD" : -7016951222732002885,
+    "1C18DED1-EF25-4103-AAA8-FF9B0BFA34C7" : -9132856871447970359,
+    "26FF1BF2-03B4-4D76-9BC4-5E8F460CD99A" : -5156844935984497485,
+    "617C14F0-4E91-40ED-84D3-0FE49199CE97" : 8486956994966675305,
+    "73625D31-1A48-498A-998B-A413E0F4A7AC" : -5247693535009375925,
     "ACEEA3BC-0AAA-4DE3-B49B-FFA37FE468DB" : -1341409851089466031,
     "AF09ED6F-1707-48FD-8720-65B998362C09" : 1355099046669336935,
-    "EC3A13D7-86C9-4298-8EAC-4F34A25FA55C" : -3409464132517209917,
+    "F6AC1292-9483-4045-8A8B-1E3F692C8028" : 348436561568523942,
     "FA847D6C-20D0-45C9-B790-10C2D043E960" : 708636742702135768
   }
 }

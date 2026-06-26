@@ -15,20 +15,27 @@ final class MovementSystem: System {
     required init(scene: Scene) {}
     
     func update(context: SceneUpdateContext) {
+        let env = context.scene.findEntity(named: "Environment")
+        let center = env?.position(relativeTo: nil) ?? SIMD3<Float>(0, 0, 0)
+        let limitRadius: Float = env != nil ? 1.5 : 4.0
+        let limitY = center.y - 0.5
+        
         for entity in context.entities(matching: Self.query, updatingSystemWhen: .rendering) {
             guard var stateComp = entity.components[EntityStateComponent.self] else { continue }
             
             var pos = entity.position(relativeTo: nil)
             
-            // Failsafe: if entity somehow falls below the floor, reset it to ground level (y = 0.1)
-            if pos.y < -0.2 {
+            // Failsafe: if entity falls below the floor, reset it relative to center
+            if pos.y < limitY {
                 var newPos = entity.position
-                newPos.y = 0.1
+                newPos.y = center.y + 0.5
+                newPos.x = center.x + Float.random(in: -0.5...0.5)
+                newPos.z = center.z + Float.random(in: -0.5...0.5)
                 entity.position = newPos
-                pos.y = 0.1 // Update local pos variable
+                pos = newPos // Update local pos variable
                 
                 var motion = entity.components[PhysicsMotionComponent.self] ?? PhysicsMotionComponent()
-                motion.linearVelocity.y = 0
+                motion.linearVelocity = .zero
                 entity.components[PhysicsMotionComponent.self] = motion
             }
             
@@ -40,12 +47,13 @@ final class MovementSystem: System {
                     stateComp.changeDirTimer = Double.random(in: 1...3)
                 }
                 
-                // Keep entities within a 4.0 meter radius from the origin on the XZ plane
-                let distanceXZ = sqrt(pos.x * pos.x + pos.z * pos.z)
-                if distanceXZ > 4.0 {
-                    // Turn back towards the origin on the XZ plane
-                    let toOrigin = normalize(SIMD3<Float>(-pos.x, 0, -pos.z))
-                    stateComp.direction = toOrigin
+                // Keep entities within the limit radius from the center
+                let offset = pos - center
+                let distanceXZ = sqrt(offset.x * offset.x + offset.z * offset.z)
+                if distanceXZ > limitRadius {
+                    // Turn back towards the center on the XZ plane
+                    let toCenter = normalize(SIMD3<Float>(-offset.x, 0, -offset.z))
+                    stateComp.direction = toCenter
                 }
                 
                 // Rotate the entity to face its walking direction on the XZ plane
