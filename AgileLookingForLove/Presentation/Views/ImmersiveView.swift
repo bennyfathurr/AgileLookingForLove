@@ -16,6 +16,9 @@ struct ImmersiveView: View {
     @Environment(AppModel.self) var appModel
     @State private var floorEntity: Entity? = nil
     private let trackingSession = SpatialTrackingSession()
+    
+    let sceneReconstruction = SceneReconstructionProvider(modes: [.classification])
+    let arSession = ARKitSession()
 
     var body: some View {
         RealityView { (content: inout RealityViewContent, attachments: RealityViewAttachments) in
@@ -83,6 +86,11 @@ struct ImmersiveView: View {
             sceneRoot.name = "SceneRoot"
             content.add(sceneRoot)
             
+            // Root entity for floors to bypass inout capture restriction
+            let floorRoot = Entity()
+            floorRoot.name = "FloorRoot"
+            content.add(floorRoot)
+            
             // Load templates and spawn initial entities once templates are ready
             Task {
                 await appModel.viewModel.loadTemplates()
@@ -110,17 +118,36 @@ struct ImmersiveView: View {
                 for _ in 0..<4 {
                     appModel.viewModel.spawnEntity()
                 }
+                try? await arSession.run([sceneReconstruction])
             }
             
-            // Start plane detection to find and spawn floor
+            // Start scene reconstruction to find and spawn mesh floor
             Task {
-                let configuration = SpatialTrackingSession.Configuration(
-                    tracking: [],
-                    sceneUnderstanding: [.collision, .physics]
-                )
-                let _ = await trackingSession.run(configuration)
-                print("Spatial Tracking Session (Room Mesh) berjalan sukses!")
+                for await update in sceneReconstruction.anchorUpdates {
+                    let anchor = update.anchor
+                    let floorName = "MeshFloor_\(anchor.id)"
+                    
+                    switch update.event {
+                    case .added, .updated:
+                        if let floorEntity = await createVisualFloor(from: anchor) {
+                            if let existingFloor = floorRoot.children.first(where: { $0.name == floorName }) {
+                                floorRoot.removeChild(existingFloor)
+                            }
+                            floorRoot.addChild(floorEntity)
+                        } else {
+                            if let existingFloor = floorRoot.children.first(where: { $0.name == floorName }) {
+                                floorRoot.removeChild(existingFloor)
+                            }
+                        }
+                        
+                    case .removed:
+                        if let existingFloor = floorRoot.children.first(where: { $0.name == floorName }) {
+                            floorRoot.removeChild(existingFloor)
+                        }
+                    }
+                }
             }
+
             
             // UI
             let headAnchor = AnchorEntity(.head)
@@ -178,6 +205,84 @@ struct ImmersiveView: View {
 
             try? await HandTrackingService.shared.start()
         }
+        
+    }
+    
+    // Helper function to create the visual floor mesh from MeshAnchor
+    private func createVisualFloor(from anchor: MeshAnchor) async -> ModelEntity? {
+        guard let floorMesh = try? generateFloorMesh(from: anchor.geometry) else { return nil }
+        guard let collisionShape = try? await ShapeResource.generateStaticMesh(from: floorMesh) else { return nil }
+        
+        var material = SimpleMaterial()
+        material.color = .init(tint: UIColor(red: 0.45, green: 0.30, blue: 0.15, alpha: 1.0)) // Dirt brown
+        material.roughness = 0.9 // Matte finish
+        
+        let floorModel = ModelEntity(mesh: floorMesh, materials: [material])
+        floorModel.name = "MeshFloor_\(anchor.id)"
+        floorModel.transform = Transform(matrix: anchor.originFromAnchorTransform)
+        floorModel.components.set(CollisionComponent(shapes: [collisionShape], isStatic: true))
+        floorModel.components.set(PhysicsBodyComponent(mode: .static))
+        
+        return floorModel
+    }
+    
+    // Generates a renderable MeshResource containing only faces classified as floor
+    private func generateFloorMesh(from geometry: MeshAnchor.Geometry) throws -> MeshResource? {
+        guard let classifications = geometry.classifications else { return nil }
+        
+        let faceCount = geometry.faces.count
+        let bytesPerIndex = geometry.faces.bytesPerIndex
+        let faceDataPointer = geometry.faces.buffer.contents()
+        let classificationsPointer = classifications.buffer.contents().advanced(by: classifications.offset)
+        
+        var floorFaces = [Int]()
+        for i in 0..<faceCount {
+            let classStride = classifications.stride
+            let classValue = classificationsPointer.advanced(by: i * classStride).assumingMemoryBound(to: UInt8.self).pointee
+            if let classification = SurfaceClassification(rawValue: Int(classValue)), classification == .floor {
+                floorFaces.append(i)
+            }
+        }
+        
+        guard !floorFaces.isEmpty else { return nil }
+        
+        // Extract vertices
+        let vertices = geometry.vertices
+        let vertexCount = vertices.count
+        let vertexStride = vertices.stride
+        let vertexDataPointer = vertices.buffer.contents().advanced(by: vertices.offset)
+        
+        var positions = [SIMD3<Float>]()
+        positions.reserveCapacity(vertexCount)
+        for i in 0..<vertexCount {
+            let elementPointer = vertexDataPointer.advanced(by: i * vertexStride)
+            let vertex = elementPointer.assumingMemoryBound(to: SIMD3<Float>.self).pointee
+            positions.append(vertex)
+        }
+        
+        // Extract indices
+        var indices = [UInt32]()
+        indices.reserveCapacity(floorFaces.count * 3)
+        
+        for faceIndex in floorFaces {
+            let faceOffset = faceIndex * 3 * bytesPerIndex
+            for j in 0..<3 {
+                let indexPointer = faceDataPointer.advanced(by: faceOffset + j * bytesPerIndex)
+                if bytesPerIndex == 2 {
+                    let index = indexPointer.assumingMemoryBound(to: UInt16.self).pointee
+                    indices.append(UInt32(index))
+                } else if bytesPerIndex == 4 {
+                    let index = indexPointer.assumingMemoryBound(to: UInt32.self).pointee
+                    indices.append(index)
+                }
+            }
+        }
+        
+        var desc = MeshDescriptor()
+        desc.positions = .init(positions)
+        desc.primitives = .triangles(indices)
+        
+        return try MeshResource.generate(from: [desc])
     }
 }
 
