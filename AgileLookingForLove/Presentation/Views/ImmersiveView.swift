@@ -33,6 +33,8 @@ struct ImmersiveView: View {
             LoveBeamComponent.registerComponent()
             HeadAnchorComponent.registerComponent()
             LoveProjectileComponent.registerComponent()
+            HandOverlayComponent.registerComponent()
+            HandOverlaySystem.registerSystem()
             
             // Register draw package systems
             ILFeatureHandTrackingSetup.registerSystems()
@@ -64,7 +66,18 @@ struct ImmersiveView: View {
             content.add(drawController)
             
             let hands = HandEntitySpawner.spawnHands()
-            for hand in hands { content.add(hand) }
+            var leftHandAnchor: Entity? = nil
+            var rightHandAnchor: Entity? = nil
+            for hand in hands {
+                if hand.name == "LeftHandAnchor" {
+                    hand.components.set(HandOverlayComponent(chirality: .left))
+                    leftHandAnchor = hand
+                } else if hand.name == "RightHandAnchor" {
+                    hand.components.set(HandOverlayComponent(chirality: .right))
+                    rightHandAnchor = hand
+                }
+                content.add(hand)
+            }
             
             // Fallback floor collider
             let fallbackFloor = Entity()
@@ -85,6 +98,39 @@ struct ImmersiveView: View {
             // Load templates and initial particle beam
             Task {
                 await appModel.viewModel.loadTemplates()
+                
+                // Load Glove Meshes from main app bundle directly
+                do {
+                    if let leftURL = Bundle.main.url(forResource: "LeftGlove", withExtension: "usdz"),
+                       let rightURL = Bundle.main.url(forResource: "RightGlove", withExtension: "usdz") {
+                        
+                        let leftGlove = try await ModelEntity(contentsOf: leftURL)
+                        let rightGlove = try await ModelEntity(contentsOf: rightURL)
+                        
+                        if let leftAnchor = leftHandAnchor {
+                            leftAnchor.addChild(leftGlove)
+                            if var comp = leftAnchor.components[HandOverlayComponent.self] {
+                                comp.gloveWrapper = leftGlove
+                                comp.gloveModel = leftGlove
+                                leftAnchor.components.set(comp)
+                            }
+                        }
+                        
+                        if let rightAnchor = rightHandAnchor {
+                            rightAnchor.addChild(rightGlove)
+                            if var comp = rightAnchor.components[HandOverlayComponent.self] {
+                                comp.gloveWrapper = rightGlove
+                                comp.gloveModel = rightGlove
+                                rightAnchor.components.set(comp)
+                            }
+                        }
+                        print("[ImmersiveView] Glove ModelEntities loaded directly from main bundle resources!")
+                    } else {
+                        print("[ImmersiveView] LeftGlove or RightGlove not found in main bundle.")
+                    }
+                } catch {
+                    print("[ImmersiveView] Failed to load glove ModelEntities: \(error)")
+                }
                 
                 do {
                     let loveShot = try await Entity(named: "Love Shot", in: realityKitContentBundle)

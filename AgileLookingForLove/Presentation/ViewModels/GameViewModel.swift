@@ -48,6 +48,8 @@ final class GameViewModel {
             let cubeTemplate = try await Entity(named: "Animation/kotak_walk_anim", in: realityKitContentBundle)
             let pyramidTemplate = try await Entity(named: "Animation/segitiga_walk_anim", in: realityKitContentBundle)
             
+             
+            
             shapeTemplates[.sphere] = sphereTemplate
             shapeTemplates[.cube] = cubeTemplate
             shapeTemplates[.pyramid] = pyramidTemplate
