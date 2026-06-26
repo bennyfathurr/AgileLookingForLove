@@ -18,7 +18,7 @@ extension Notification.Name {
 
 public struct LoveProjectileComponent: Component {
     public var direction: SIMD3<Float>
-    public var speed: Float = 3.0 // Kecepatan gerak forward (m/s) disamakan dengan speed partikel
+    public var speed: Float = 3.0
     public var distanceTraveled: Float = 0.0
     public var maxDistance: Float = 5.0
     
@@ -28,38 +28,29 @@ public struct LoveProjectileComponent: Component {
 }
 
 public struct CustomPinchGestureSystem: System {
-    // Query untuk menarik entitas controller hand-tracking yang menggambar benang
     static let query = EntityQuery(where: .has(IsDrawingComponent.self) && .has(ILHandAnchorComponent.self) && .has(DrawingComponent.self))
-    
-    // Cooldown timer untuk trigger burst tembakan
     static var lastShootTime = Date.distantPast
     
     public init(scene: Scene) {}
     
     public func update(context: SceneUpdateContext) {
-        // 1. Cari Love Beam particle entity di dalam scene
         let loveBeamQuery = EntityQuery(where: .has(LoveBeamComponent.self))
         let loveBeams = context.entities(matching: loveBeamQuery, updatingSystemWhen: .rendering)
         var loveBeamIterator = loveBeams.makeIterator()
-        guard let loveBeam = loveBeamIterator.next() else {
-            return
-        }
+        guard let loveBeam = loveBeamIterator.next() else { return }
         
         let entities = context.entities(matching: Self.query, updatingSystemWhen: .rendering)
         
         var isHeartGestureActive = false
         var heartCenter = SIMD3<Float>(0, 0, 0)
-        var beamDirection = SIMD3<Float>(0, 0, -1) // default: forward
+        var beamDirection = SIMD3<Float>(0, 0, -1)
         
-        // Update head tracker untuk mendapatkan arah pandang
         HeadTracker.shared.update()
         if let headTransform = HeadTracker.shared.lastHeadTransform {
-            // Ambil forward vector (-Z dari head transform matrix)
             let zAxis = headTransform.columns.2
             let forwardDir = -SIMD3<Float>(zAxis.x, zAxis.y, zAxis.z)
             beamDirection = simd_normalize(forwardDir)
         } else {
-            // Fallback ke traditional query jika tracker belum aktif
             let headQuery = EntityQuery(where: .has(HeadAnchorComponent.self))
             let heads = context.entities(matching: headQuery, updatingSystemWhen: .rendering)
             var headIterator = heads.makeIterator()
@@ -75,7 +66,7 @@ public struct CustomPinchGestureSystem: System {
                 continue
             }
             
-            // --- DETEKSI GESTUR HATI DENGAN DUA TANGAN (🫶) ---
+            // Detect two-handed heart gesture
             if let leftHand = anchorComp.leftHand,
                let rightHand = anchorComp.rightHand,
                let leftSkeleton = leftHand.handSkeleton,
@@ -100,7 +91,7 @@ public struct CustomPinchGestureSystem: System {
                 }
             }
             
-            // --- GESTUR PINCH JARI TENGAH (MENGGAMBAR BENANG) ---
+            // Detect right hand middle-finger drawing pinch
             if let rightHand = anchorComp.rightHand,
                let rightSkeleton = rightHand.handSkeleton,
                rightHand.isTracked {
@@ -129,23 +120,20 @@ public struct CustomPinchGestureSystem: System {
             entity.components.set(isDrawingComp)
         }
         
-        // --- UPDATE UTAMA PARTIKEL & HIT-SCAN (Sekali per frame, diluar loop entities) ---
+        // Update particle beam and projectiles
         if isHeartGestureActive {
             loveBeam.position = heartCenter
             
             if let emitterEntity = loveBeam.findEntity(named: "ParticleEmitter") {
                 if var vfx = emitterEntity.components[ParticleEmitterComponent.self] {
-                    // Update emitter properties
-                    vfx.speed = 3.0 // Slower, more visible speed
+                    vfx.speed = 3.0
                     vfx.speedVariation = 0.5
-                    
-                    vfx.mainEmitter.size = 0.05 // start size
-                    vfx.mainEmitter.sizeMultiplierAtEndOfLifespan = 4.0 // grow to 4x
+                    vfx.mainEmitter.size = 0.05
+                    vfx.mainEmitter.sizeMultiplierAtEndOfLifespan = 4.0
                     vfx.mainEmitter.sizeMultiplierAtEndOfLifespanPower = 1.0
-                    vfx.mainEmitter.lifeSpan = 1.5 // travel ~4.5 meters
-                    // Continuous emission (burst-like stream)
-                    vfx.mainEmitter.birthRate = 25.0 // thick continuous stream
-                    vfx.mainEmitter.stretchFactor = 0.0 // no flat/gepeng
+                    vfx.mainEmitter.lifeSpan = 1.5
+                    vfx.mainEmitter.birthRate = 25.0
+                    vfx.mainEmitter.stretchFactor = 0.0
                     vfx.mainEmitter.acceleration = SIMD3<Float>(0, 1.5, 0)
                     vfx.mainEmitter.angleVariation = 0.15
                     
@@ -157,12 +145,10 @@ public struct CustomPinchGestureSystem: System {
                         vfx.isEmitting = true
                     }
                     
-                    // Cooldown trigger untuk spawn proxy projectile: 0.5 detik agar spaced out stuns
                     let now = Date()
                     if now.timeIntervalSince(Self.lastShootTime) >= 0.5 {
                         Self.lastShootTime = now
                         
-                        // Spawn an invisible projectile proxy that tracks the burst arrival
                         let projectile = Entity()
                         projectile.name = "LoveProjectile"
                         projectile.position = heartCenter
@@ -181,7 +167,6 @@ public struct CustomPinchGestureSystem: System {
                 }
             }
         } else {
-            // Matikan particle emitter jika gesture tidak aktif
             if let emitterEntity = loveBeam.findEntity(named: "ParticleEmitter") {
                 if var vfx = emitterEntity.components[ParticleEmitterComponent.self] {
                     if vfx.isEmitting {
@@ -192,7 +177,7 @@ public struct CustomPinchGestureSystem: System {
             }
         }
         
-        // --- UPDATE ALL ACTIVE PROJECTILES (Satu kali per frame, sinkronisasi tabrakan) ---
+        // Update projectiles and collision detection
         let projectileQuery = EntityQuery(where: .has(LoveProjectileComponent.self))
         let projectiles = context.entities(matching: projectileQuery, updatingSystemWhen: .rendering)
         let deltaTime = Float(context.deltaTime)
@@ -215,14 +200,12 @@ public struct CustomPinchGestureSystem: System {
                 let shapePos = shape.position(relativeTo: nil as Entity?)
                 let dist = simd_distance(projectile.position, shapePos)
                 
-                // Stun triggered exactly when the projectile arrives at the shape (0.4m radius)
                 if dist < 0.4 {
                     var mutableStateComp = stateComp
                     mutableStateComp.state = .stunned
                     mutableStateComp.stunTimer = 5.0
                     shape.components[EntityStateComponent.self] = mutableStateComp
                     
-                    // Efek visual stun
                     NotificationCenter.default.post(
                         name: .stunEntityRequested,
                         object: nil,
@@ -242,13 +225,11 @@ public struct CustomPinchGestureSystem: System {
         }
     }
     
-    /// Compute quaternion that rotates vector `from` to vector `to`
     private func quaternionFromTo(from: SIMD3<Float>, to: SIMD3<Float>) -> simd_quatf {
         let dot = simd_dot(from, to)
         if dot > 0.9999 {
-            return simd_quatf(ix: 0, iy: 0, iz: 0, r: 1) // same direction
+            return simd_quatf(ix: 0, iy: 0, iz: 0, r: 1)
         } else if dot < -0.9999 {
-            // 180° flip — find perpendicular axis
             var perp = simd_cross(from, SIMD3<Float>(0, 1, 0))
             if simd_length(perp) < 0.001 {
                 perp = simd_cross(from, SIMD3<Float>(1, 0, 0))
