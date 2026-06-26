@@ -103,10 +103,12 @@ final class GameViewModel {
     }
 
     func handleShoot(entity: Entity) {
-        guard var stateComp = entity.components[EntityStateComponent.self],
-              (stateComp.state == .idle || stateComp.state == .walking) else { return }
+        guard var stateComp = entity.components[EntityStateComponent.self] else { return }
+        
+        // Accept idle, walking, OR already-stunned (ECS may have pre-set state; we still apply visuals)
+        guard stateComp.state == .idle || stateComp.state == .walking || stateComp.state == .stunned else { return }
 
-        // Ubah state ke stunned
+        // Ubah state ke stunned (idempotent - safe to call even if already stunned)
         stateComp.state = .stunned
         stateComp.stunTimer = 5.0
         entity.components[EntityStateComponent.self] = stateComp

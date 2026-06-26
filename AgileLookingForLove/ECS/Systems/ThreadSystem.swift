@@ -16,7 +16,7 @@ final class ThreadSystem: System {
     
     func update(context: SceneUpdateContext) {
         for entity in context.entities(matching: Self.query, updatingSystemWhen: .rendering) {
-            guard var anchor = entity.components[ThreadAnchorComponent.self],
+            guard let anchor = entity.components[ThreadAnchorComponent.self],
                   let partnerID = anchor.partnerID,
                   let partner = context.scene.findEntity(id: partnerID),
                   let threadEntity = anchor.threadEntity else { continue }

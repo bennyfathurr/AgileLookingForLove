@@ -29,6 +29,9 @@ struct ImmersiveView: View {
             ThreadAnchorComponent.registerComponent()
             OriginalMaterialsComponent.registerComponent()
             RedThreadValidationSystem.registerSystem()
+            LoveBeamComponent.registerComponent()
+            HeadAnchorComponent.registerComponent()
+            LoveProjectileComponent.registerComponent()
             
             //ILDraw Package
             ILFeatureHandTrackingSetup.registerSystems()
@@ -75,9 +78,34 @@ struct ImmersiveView: View {
             
             appModel.viewModel.setContent(content)
             
+            // Root entity for asynchronously loaded items (bypasses inout capture restriction)
+            let sceneRoot = Entity()
+            sceneRoot.name = "SceneRoot"
+            content.add(sceneRoot)
+            
             // Load templates and spawn initial entities once templates are ready
             Task {
                 await appModel.viewModel.loadTemplates()
+                
+                // === LOAD LOVE SHOT PARTICLE ===
+                do {
+                    let loveShot = try await Entity(named: "Love Shot", in: realityKitContentBundle)
+                    loveShot.name = "LoveBeam"
+                    loveShot.components.set(LoveBeamComponent())
+                    
+                    if let emitter = loveShot.findEntity(named: "ParticleEmitter") {
+                           if var vfx = emitter.components[ParticleEmitterComponent.self] {
+                               vfx.isEmitting = false // Gunakan isEmitting
+                               emitter.components.set(vfx)
+                           }
+                       }
+                    
+                    sceneRoot.addChild(loveShot)
+                    print("[ImmersiveView] Love Shot particle system loaded!")
+                } catch {
+                    print("[ImmersiveView] Failed to load Love Shot: \(error)")
+                }
+                
                 try? await Task.sleep(nanoseconds: 5_000_000_000)
                 for _ in 0..<4 {
                     appModel.viewModel.spawnEntity()
@@ -96,8 +124,9 @@ struct ImmersiveView: View {
             
             // UI
             let headAnchor = AnchorEntity(.head)
+            headAnchor.components.set(HeadAnchorComponent())
             if let hudEntity = attachments.entity(for: "HUDOverlay") {
-                hudEntity.position = SIMD3<Float>(0, 0.10, -0.7)
+                hudEntity.position = SIMD3<Float>(0.10, -0.15, -0.7)
                 headAnchor.addChild(hudEntity)
             }
             content.add(headAnchor)
@@ -135,9 +164,17 @@ struct ImmersiveView: View {
             let stroke = notif.userInfo?["strokeEntity"] as? Entity
             appModel.viewModel.handleThreadStroke(entityA: a, entityB: b, strokeEntity: stroke)
         }
+        .onReceive(NotificationCenter.default.publisher(for: .stunEntityRequested)) { notif in
+            if let entity = notif.userInfo?["entity"] as? Entity {
+                appModel.viewModel.handleShoot(entity: entity)
+            }
+        }
         .task {
             let arSession = ARKitSession()
             _ = await arSession.requestAuthorization(for: [.handTracking, .worldSensing])
+
+            // Start head tracker for querying head pose/anchor
+            await HeadTracker.shared.start()
 
             try? await HandTrackingService.shared.start()
         }
