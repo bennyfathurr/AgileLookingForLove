@@ -44,9 +44,9 @@ final class GameViewModel {
     
     func loadTemplates() async {
         do {
-            let sphereTemplate = try await Entity(named: "bundar_walk_anim 2", in: realityKitContentBundle)
-            let cubeTemplate = try await Entity(named: "kotak_walk_anim", in: realityKitContentBundle)
-            let pyramidTemplate = try await Entity(named: "segitiga_walk_anim", in: realityKitContentBundle)
+            let sphereTemplate = try await Entity(named: "Animation/bundar_walk_anim", in: realityKitContentBundle)
+            let cubeTemplate = try await Entity(named: "Animation/kotak_walk_anim", in: realityKitContentBundle)
+            let pyramidTemplate = try await Entity(named: "Animation/segitiga_walk_anim", in: realityKitContentBundle)
             
             shapeTemplates[.sphere] = sphereTemplate
             shapeTemplates[.cube] = cubeTemplate
