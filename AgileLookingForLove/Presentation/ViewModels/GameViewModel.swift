@@ -61,7 +61,7 @@ final class GameViewModel {
     private var activeEntities: [Entity] = []
     private let maxEntitiesCount: Int = 8
     private var spawnTimer: Double = 0.0
-    private let spawnInterval: Double = 5.0
+    //private let spawnInterval: Double = 5.0
     private let maxSpawnedEntities = 6
     
     var shapeTemplates: [ShapeKind: Entity] = [:]
@@ -193,12 +193,7 @@ final class GameViewModel {
             refreshInstruction()
         }
         
-        // Spawn entities over time
-        spawnAccumulator += delta
-        if spawnAccumulator >= spawnInterval {
-            spawnAccumulator = 0.0
-            spawnEntity()
-        }
+        // Spawning is now handled by the periodic spawning logic below.
         
         // Tick global game timer
         gameTimeLeft -= delta
@@ -581,8 +576,15 @@ final class GameViewModel {
     }
     
     func resetSession() {
+        self.environmentEntity?.removeFromParent()
         self.environmentEntity = nil
+        
+        self.placementIndicator?.removeFromParent()
         self.placementIndicator = nil
+        
+        for entity in activeEntities {
+            entity.removeFromParent()
+        }
         self.activeEntities.removeAll()
         self.firstSelectedEntity = nil
         self.connectionResult = .none
@@ -594,6 +596,92 @@ final class GameViewModel {
     func prepareForReopen() {
         self.isSessionRestored = false
         print("[GameViewModel] Prepared session for reopening.")
+    }
+    
+    func startCountdown() {
+        gameState = .countdown(3)
+        
+        Task {
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            if case .countdown(3) = gameState {
+                gameState = .countdown(2)
+            } else { return }
+            
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            if case .countdown(2) = gameState {
+                gameState = .countdown(1)
+            } else { return }
+            
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            if case .countdown(1) = gameState {
+                startGamePlay()
+            }
+        }
+    }
+    
+    private func startGamePlay() {
+        if environmentEntity != nil {
+            if activeEntities.isEmpty {
+                if let env = environmentEntity {
+                    let groundY = env.position(relativeTo: nil).y
+                    for _ in 0..<4 {
+                        spawnEntityAt(groundY: groundY)
+                    }
+                }
+            }
+        }
+        
+        gameState = .playing
+        gameTimeLeft = 30.0
+        spawnAccumulator = 0.0
+        repository.resetScore()
+        score = 0
+        
+        refreshInstruction()
+    }
+    
+    func clearPlayingEntities() {
+        for entity in activeEntities {
+            entity.removeFromParent()
+        }
+        activeEntities.removeAll()
+        
+        if let content = self.content {
+            if let drawController = content.entities.first(where: { $0.name == "DrawController" }) {
+                if var dc = drawController.components[DrawingComponent.self] {
+                    dc.activeStrokeEntity = nil
+                    dc.currentStrokeID = nil
+                    dc.activeStrokePoints.removeAll()
+                    dc.lastPlacedPosition = nil
+                    dc.isGeneratingMesh = false
+                    drawController.components.set(dc)
+                }
+                if var isDrawing = drawController.components[IsDrawingComponent.self] {
+                    isDrawing.isActive = false
+                    isDrawing.frameCount = 0
+                    drawController.components.set(isDrawing)
+                }
+            }
+            
+            if let canvas = content.entities.first(where: { $0.name == "RedThreadCanvas" }) {
+                canvas.children.removeAll()
+            }
+            
+            let extraEntities = content.entities.filter { 
+                ($0.name.hasPrefix("RedThread") && $0.name != "RedThreadCanvas") || 
+                $0.name == "LoveProjectile" 
+            }
+            for entity in extraEntities {
+                entity.removeFromParent()
+            }
+        }
+        firstSelectedEntity = nil
+    }
+    
+    func exitToMenu() {
+        clearPlayingEntities()
+        resetSession()
+        gameState = .menu
     }
 }
 

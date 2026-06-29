@@ -34,6 +34,10 @@ struct ImmersiveView: View {
             LoveProjectileComponent.registerComponent()
             EnvironmentComponent.registerComponent()
             
+            // Hand Overlay Setup
+            HandOverlayComponent.registerComponent()
+            HandOverlaySystem.registerSystem()
+            
             // Register draw package systems
             ILFeatureHandTrackingSetup.registerSystems()
             IsDrawingComponent.registerComponent()
@@ -99,6 +103,37 @@ struct ImmersiveView: View {
             Task {
                 await appModel.viewModel.loadTemplates()
                 
+                // Load Glove Meshes from RealityKitContent bundle
+                do {
+                    let leftGlove = try await Entity(named: "Meshes/LeftGlove", in: realityKitContentBundle)
+                    let rightGlove = try await Entity(named: "Meshes/RightGlove", in: realityKitContentBundle)
+                    
+                    // Force all materials in glove models to be opaque
+                    makeMaterialsOpaque(in: leftGlove)
+                    makeMaterialsOpaque(in: rightGlove)
+                    
+                    if let leftAnchor = leftHandAnchor {
+                        leftAnchor.addChild(leftGlove)
+                        if var comp = leftAnchor.components[HandOverlayComponent.self] {
+                            comp.gloveWrapper = leftGlove
+                            comp.gloveModel = nil
+                            leftAnchor.components.set(comp)
+                        }
+                    }
+                    
+                    if let rightAnchor = rightHandAnchor {
+                        rightAnchor.addChild(rightGlove)
+                        if var comp = rightAnchor.components[HandOverlayComponent.self] {
+                            comp.gloveWrapper = rightGlove
+                            comp.gloveModel = nil
+                            rightAnchor.components.set(comp)
+                        }
+                    }
+                    print("[ImmersiveView] Glove entities loaded directly from RealityKitContent bundle!")
+                } catch {
+                    print("[ImmersiveView] Failed to load glove entities: \(error)")
+                }
+                
                 // OAD LOVE SHOT PARTICLE
                 do {
                     let loveShot = try await Entity(named: "Love Shot", in: realityKitContentBundle)
@@ -148,18 +183,18 @@ struct ImmersiveView: View {
                 HUDOverlayView(viewModel: appModel.viewModel)
             }
         }
-        .gesture(
-            SpatialTapGesture()
-                .targetedToAnyEntity()
-                .onEnded { value in
-                    let entity = value.entity
-                    let stateComp = entity.components[EntityStateComponent.self]
-                    
-                    if stateComp?.state == .idle || stateComp?.state == .walking {
-                        appModel.viewModel.handleShoot(entity: entity)
-                    }
-                }
-        )
+//        .gesture(
+//            SpatialTapGesture()
+//                .targetedToAnyEntity()
+//                .onEnded { value in
+//                    let entity = value.entity
+//                    let stateComp = entity.components[EntityStateComponent.self]
+//                    
+//                    if stateComp?.state == .idle || stateComp?.state == .walking {
+//                        appModel.viewModel.handleShoot(entity: entity)
+//                    }
+//                }
+//        )
         .gesture(
             DragGesture()
                 .targetedToAnyEntity()

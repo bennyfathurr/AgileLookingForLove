@@ -19,31 +19,44 @@ struct ContentView: View {
     private let timer = Timer.publish(every: 0.1, on: .main, in: .common).autoconnect()
     
     var body: some View {
-        VStack(spacing: 20) {
-            ToggleImmersiveSpaceButton()
-            
-            if appModel.immersiveSpaceState == .open {
-                if appModel.viewModel.environmentEntity == nil {
-                    Button(action: {
-                        appModel.viewModel.createEnvironment()
-                    }) {
-                        Text("Create Env")
-                            .font(.headline)
-                            .padding()
-                            .frame(minWidth: 160)
-                            .background(Color.blue.opacity(0.8))
-                            .foregroundColor(.white)
-                            .cornerRadius(12)
+        VStack {
+            switch appModel.viewModel.gameState {
+            case .menu:
+                MainMenuView(appModel: appModel) {
+                    appModel.viewModel.gameState = .instructions
+                }
+                
+            case .instructions:
+                InstructionsView(appModel: appModel) {
+                    Task { @MainActor in
+                        if appModel.immersiveSpaceState == .closed {
+                            appModel.immersiveSpaceState = .inTransition
+                            let result = await openImmersiveSpace(id: appModel.immersiveSpaceID)
+                            if result == .opened {
+                                appModel.viewModel.gameState = .playing
+                            } else {
+                                appModel.immersiveSpaceState = .closed
+                            }
+                        } else {
+                            appModel.viewModel.gameState = .playing
+                        }
                     }
-                } else {
-                    Text("Environment Placed")
-                        .font(.headline)
-                        .padding()
-                        .foregroundColor(.secondary)
+                }
+                
+            case .countdown, .playing, .gameOver:
+                InGameDashboardView(appModel: appModel) {
+                    Task { @MainActor in
+                        if appModel.immersiveSpaceState == .open {
+                            appModel.immersiveSpaceState = .inTransition
+                            await dismissImmersiveSpace()
+                        }
+                        appModel.viewModel.exitToMenu()
+                    }
                 }
             }
         }
-        .padding()
+        .padding(24)
+        .frame(width: 460, height: 500)
         .onReceive(timer) { _ in
             if appModel.immersiveSpaceState == .open {
                 appModel.viewModel.tickTimer(delta: 0.1)
@@ -165,15 +178,41 @@ struct InGameDashboardView: View {
         VStack(spacing: 28) {
             Spacer()
             
-            VStack(spacing: 12) {
-                Text(appModel.viewModel.gameTimeLeft > 0 ? "Game in Progress..." : "Game Ended")
-                    .font(.system(size: 24, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
-                
-                if appModel.viewModel.gameTimeLeft > 0 {
-                    Text("Look around in the Immersive Space to play.")
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundColor(.white.opacity(0.7))
+            if appModel.viewModel.environmentEntity == nil {
+                VStack(spacing: 16) {
+                    Text("Place the Environment")
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                    
+                    Text("Drag the Green Placement Indicator in spatial space to position the platform, then tap below to lock the area.")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white.opacity(0.85))
+                        .multilineTextAlignment(.center)
+                    
+                    Button(action: {
+                        appModel.viewModel.createEnvironment()
+                    }) {
+                        Text("Create Env")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.blue)
+                }
+                .padding(.horizontal, 24)
+            } else {
+                VStack(spacing: 12) {
+                    Text(appModel.viewModel.gameTimeLeft > 0 ? "Game in Progress..." : "Game Ended")
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                    
+                    if appModel.viewModel.gameTimeLeft > 0 {
+                        Text("Look around in the Immersive Space to play.")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundColor(.white.opacity(0.7))
+                    }
                 }
             }
             

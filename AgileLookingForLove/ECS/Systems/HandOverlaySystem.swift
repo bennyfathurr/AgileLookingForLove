@@ -16,16 +16,31 @@ public class HandOverlaySystem: System {
 
     required public init(scene: RealityKit.Scene) {}
 
+    private static var updateCount = 0
+
     public func update(context: SceneUpdateContext) {
-        for entity in context.entities(matching: Self.query, updatingSystemWhen: .rendering) {
+        Self.updateCount += 1
+        let entities = context.entities(matching: Self.query, updatingSystemWhen: .rendering)
+        
+        if Self.updateCount < 200 || Self.updateCount % 60 == 0 {
+            print("[HandOverlaySystem] Update #\(Self.updateCount). Found \(Array(entities).count) entities in query.")
+        }
+        
+        for entity in entities {
             guard var overlay = entity.components[HandOverlayComponent.self] else { continue }
             
             // glove model load
-            guard let gloveWrapper = overlay.gloveWrapper else { continue }
+            guard let gloveWrapper = overlay.gloveWrapper else {
+                if Self.updateCount < 200 || Self.updateCount % 60 == 0 {
+                    print("[HandOverlaySystem] \(overlay.chirality) gloveWrapper is nil!")
+                }
+                continue
+            }
 
             // Locate the ModelEntity from the loaded wrapper if we haven't yet
             if overlay.gloveModel == nil {
                 overlay.gloveModel = findModelEntity(in: gloveWrapper)
+                print("[HandOverlaySystem] Resolved gloveModel for \(overlay.chirality): \(overlay.gloveModel != nil ? "Success" : "Failed")")
             }
 
             // Get the latest hand anchor from HandTrackingService.shared based on chirality
@@ -33,18 +48,27 @@ public class HandOverlaySystem: System {
                 HandTrackingService.shared.latestLeftHand :
                 HandTrackingService.shared.latestRightHand
             else {
+                if Self.updateCount < 200 || Self.updateCount % 60 == 0 {
+                    print("[HandOverlaySystem] latest \(overlay.chirality) HandAnchor from HandTrackingService is nil")
+                }
                 // Hide glove root if anchor is not tracked or available
                 gloveWrapper.isEnabled = false
                 continue
             }
 
             guard handAnchor.isTracked, let skeleton = handAnchor.handSkeleton else {
+                if Self.updateCount < 200 || Self.updateCount % 60 == 0 {
+                    print("[HandOverlaySystem] HandAnchor \(overlay.chirality) tracked: \(handAnchor.isTracked), skeleton exists: \(handAnchor.handSkeleton != nil)")
+                }
                 gloveWrapper.isEnabled = false
                 continue
             }
 
             // Enable glove mesh
-            gloveWrapper.isEnabled = true
+            if !gloveWrapper.isEnabled {
+                gloveWrapper.isEnabled = true
+                print("[HandOverlaySystem] \(overlay.chirality) hand tracked successfully. Enabling glove mesh!")
+            }
             
             // Position the glove root at the hand anchor origin
             gloveWrapper.transform = Transform(matrix: handAnchor.originFromAnchorTransform)
