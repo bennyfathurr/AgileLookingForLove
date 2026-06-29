@@ -29,5 +29,6 @@ struct AgileLookingForLoveApp: App {
                 }
         }
         .immersionStyle(selection: .constant(.mixed), in: .mixed)
+        .upperLimbVisibility(.hidden)
      }
 }

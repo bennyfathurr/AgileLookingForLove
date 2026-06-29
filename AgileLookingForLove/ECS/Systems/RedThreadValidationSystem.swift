@@ -8,6 +8,7 @@
 import RealityKit
 import ILSSpatialDraw
 import Foundation
+import ILSSpatialAudio
 
 final class RedThreadValidationSystem: System {
     static let drawQuery  = EntityQuery(where: .has(DrawingComponent.self) && .has(IsDrawingComponent.self))
@@ -16,7 +17,8 @@ final class RedThreadValidationSystem: System {
     private var cachedStrokePoints: [SIMD3<Float>] = []
     private var cachedStrokeEntity: Entity? = nil
     
-    required init(scene: Scene) {}
+    required init(scene: Scene) {
+    }
     func update(context: SceneUpdateContext) {
         // print periodically to verify the system is running
         if Int.random(in: 1...300) == 1 {
@@ -99,6 +101,7 @@ final class RedThreadValidationSystem: System {
             if let a = startEntity, let b = endEntity {
                 print("[RedThreadValidationSystem] Selected: A=\(a.name) (dist \(minStartDist)), B=\(b.name) (dist \(minEndDist))")
                 if a.id != b.id {
+                    AudioManager.shared.play(.connect, on: a)
                     print("[RedThreadValidationSystem] Posting threadStrokeConnected notification!")
                     NotificationCenter.default.post(
                         name: .threadStrokeConnected,
