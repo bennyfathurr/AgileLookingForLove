@@ -12,92 +12,19 @@ import ILSSpatialDraw
 import ILSHandTracking
 import ARKit
 
-
 //search about the view what
 struct ImmersiveView: View {
     @Environment(AppModel.self) var appModel
-    @State private var floorEntity: Entity? = nil
     private let trackingSession = SpatialTrackingSession()
 
     var body: some View {
         RealityView { (content: inout RealityViewContent, attachments: RealityViewAttachments) in
-            InstructionSystem.registerSystem()
-            ThreadSystem.registerSystem()
-            MovementSystem.registerSystem()
-            ShapeComponent.registerComponent()
-            EntityStateComponent.registerComponent()
-            ThreadAnchorComponent.registerComponent()
-            OriginalMaterialsComponent.registerComponent()
-            RedThreadValidationSystem.registerSystem()
-            MergeAnimationComponent.registerComponent()
-            MergeAnimationSystem.registerSystem()
-            LoveBeamComponent.registerComponent()
-            HeadAnchorComponent.registerComponent()
-            LoveProjectileComponent.registerComponent()
-            HandOverlayComponent.registerComponent()
-            HandOverlaySystem.registerSystem()
             
-            // Register draw package systems
-            ILFeatureHandTrackingSetup.registerSystems()
-            IsDrawingComponent.registerComponent()
-            DrawingComponent.registerComponent()
-            CanvasComponent.registerComponent()
-            SharePlayReceiverComponent.registerComponent()
-            
-            CustomPinchGestureSystem.registerSystem()
-            CustomDrawingSystem.registerSystem()
-            
-            // Canvas setup
-            let canvas = Entity()
-            canvas.name = "RedThreadCanvas"
-            canvas.components.set(CanvasComponent())
-            content.add(canvas)
-            
-            // Draw controller setup
-            let drawController = Entity()
-            drawController.name = "DrawController"
-            
-            var drawComp = DrawingComponent()
-            drawComp.currentColor = SIMD4<Float>(0.9, 0.1, 0.1, 1.0)
-            drawComp.sphereRadius = 0.004
-            drawController.components.set(drawComp)
-            
-            drawController.components.set(IsDrawingComponent())
-            drawController.components.set(ILHandAnchorComponent())
-            content.add(drawController)
-            
-            let hands = HandEntitySpawner.spawnHands()
-            var leftHandAnchor: Entity? = nil
-            var rightHandAnchor: Entity? = nil
-            for hand in hands {
-                if hand.name == "LeftHandAnchor" {
-                    hand.components.set(HandOverlayComponent(chirality: .left))
-                    leftHandAnchor = hand
-                } else if hand.name == "RightHandAnchor" {
-                    hand.components.set(HandOverlayComponent(chirality: .right))
-                    rightHandAnchor = hand
-                }
-                content.add(hand)
-            }
-            
-            // Fallback floor collider
-            let fallbackFloor = Entity()
-            fallbackFloor.name = "FallbackFloor"
-            let floorShape = ShapeResource.generateBox(width: 50, height: 0.1, depth: 50)
-            fallbackFloor.components.set(CollisionComponent(shapes: [floorShape], isStatic: true))
-            fallbackFloor.components.set(PhysicsBodyComponent(mode: .static))
-            fallbackFloor.position = SIMD3<Float>(0, -0.05, 0)
-            content.add(fallbackFloor)
-            
-            appModel.viewModel.setContent(content)
-            
-            // Root entity for loaded items
-            let sceneRoot = Entity()
-            sceneRoot.name = "SceneRoot"
-            content.add(sceneRoot)
+            let anchors = await GameSimulationBuilder.setupSimulation(in: &content, viewModel: appModel.viewModel, attachments: attachments, trackingSession: trackingSession)
             
             // Load templates and initial particle beam
             Task {
+                
                 await appModel.viewModel.loadTemplates()
                 
                 // Load Glove Meshes from RealityKitContent bundle
@@ -109,23 +36,20 @@ struct ImmersiveView: View {
                     makeMaterialsOpaque(in: leftGlove)
                     makeMaterialsOpaque(in: rightGlove)
                     
-                    if let leftAnchor = leftHandAnchor {
-                        leftAnchor.addChild(leftGlove)
-                        if var comp = leftAnchor.components[HandOverlayComponent.self] {
-                            comp.gloveWrapper = leftGlove
-                            comp.gloveModel = nil
-                            leftAnchor.components.set(comp)
-                        }
+                    anchors.leftHandAnchor.addChild(leftGlove)
+                    if var comp = anchors.leftHandAnchor.components[HandOverlayComponent.self] {
+                        comp.gloveWrapper = leftGlove
+                        comp.gloveModel = nil
+                        anchors.leftHandAnchor.components.set(comp)
                     }
                     
-                    if let rightAnchor = rightHandAnchor {
-                        rightAnchor.addChild(rightGlove)
-                        if var comp = rightAnchor.components[HandOverlayComponent.self] {
-                            comp.gloveWrapper = rightGlove
-                            comp.gloveModel = nil
-                            rightAnchor.components.set(comp)
-                        }
+                    anchors.rightHandAnchor.addChild(rightGlove)
+                    if var comp = anchors.rightHandAnchor.components[HandOverlayComponent.self] {
+                        comp.gloveWrapper = rightGlove
+                        comp.gloveModel = nil
+                        anchors.rightHandAnchor.components.set(comp)
                     }
+                    
                     print("[ImmersiveView] Glove entities loaded directly from RealityKitContent bundle!")
                 } catch {
                     print("[ImmersiveView] Failed to load glove entities: \(error)")
@@ -143,7 +67,8 @@ struct ImmersiveView: View {
                         }
                     }
                     
-                    sceneRoot.addChild(loveShot)
+                    anchors.sceneRoot.addChild(loveShot)
+                    
                     print("[ImmersiveView] Love Shot particle system loaded!")
                 } catch {
                     print("[ImmersiveView] Failed to load Love Shot: \(error)")
@@ -176,18 +101,6 @@ struct ImmersiveView: View {
                 HUDOverlayView(viewModel: appModel.viewModel)
             }
         }
-//        .gesture(
-//            SpatialTapGesture()
-//                .targetedToAnyEntity()
-//                .onEnded { value in
-//                    let entity = value.entity
-//                    let stateComp = entity.components[EntityStateComponent.self]
-//                    
-//                    if stateComp?.state == .idle || stateComp?.state == .walking {
-//                        appModel.viewModel.handleShoot(entity: entity)
-//                    }
-//                }
-//        )
         .onReceive(NotificationCenter.default.publisher(for: .threadStrokeConnected)) { notif in
             guard let a = notif.userInfo?["entityA"] as? Entity,
                   let b = notif.userInfo?["entityB"] as? Entity else { return }
@@ -227,9 +140,4 @@ struct ImmersiveView: View {
             makeMaterialsOpaque(in: child)
         }
     }
-}
-
-#Preview(immersionStyle: .mixed) {
-    ImmersiveView()
-        .environment(AppModel())
 }

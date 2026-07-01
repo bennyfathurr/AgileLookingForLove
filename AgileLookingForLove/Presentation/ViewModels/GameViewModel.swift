@@ -12,17 +12,11 @@ import UIKit
 import _RealityKit_SwiftUI
 import RealityKitContent
 
+//Score,
 @Observable
 @MainActor
 final class GameViewModel {
-    enum GameState: Equatable {
-        case menu
-        case instructions
-        case countdown(Int)
-        case playing
-        case gameOver(victory: Bool)
-    }
-    
+
     private let repository: GameStateRepository
     private let generateInstruction: GenerateInstructionUseCase
     private let connectEntities: ConnectEntityUseCase
@@ -112,12 +106,65 @@ final class GameViewModel {
         }
     }
     
-    func refreshInstruction() {
-        let kinds = activeEntities.compactMap { $0.components[ShapeComponent.self]?.kind }
-        let uniqueKinds = Array(Set(kinds))
+    func startCountdown() {
+        gameState = .countdown(3)
         
-        currentInstruction = generateInstruction.execute(availableKinds: uniqueKinds)
-        instructionTimer = currentInstruction?.timeLimit ?? 10
+        Task {
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            if case .countdown(3) = gameState {
+                gameState = .countdown(2)
+            } else { return }
+            
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            if case .countdown(2) = gameState {
+                gameState = .countdown(1)
+            } else { return }
+            
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            if case .countdown(1) = gameState {
+                startGamePlay()
+            }
+        }
+    }
+    
+    private func startGamePlay() {
+        clearPlayingEntities()
+        gameState = .playing
+        gameTimeLeft = 50.0
+        spawnAccumulator = 0.0
+        repository.resetScore()
+        score = 0
+        
+        // Spawn initial 10 entities
+        for _ in 0..<10 {
+            spawnEntity()
+        }
+        refreshInstruction()
+    }
+    
+    //Spawn Entity
+    func spawnEntity(in content: RealityViewContent) {
+        guard activeEntities.count < maxEntitiesCount else {
+            print("[Spawning] Maximum character limit reached (\(maxEntitiesCount)). Skipping spawn.")
+            return
+        }
+        
+        let kind = ShapeKind.allCases.randomElement()!
+        let template = shapeTemplates[kind]
+        let color = colorFor(kind)
+        
+        let entity = EntityFactory.createCharacter(kind: kind, template: template, color: color)
+        
+        entity.components.set(InputTargetComponent())
+        
+        activeEntities.append(entity)
+        //spawn to ECS
+        content.add(entity)
+    }
+    
+    func spawnEntity() {
+        guard let content = self.content else { return }
+        spawnEntity(in: content)
     }
     
     func tickTimer(delta: Double) {
@@ -162,19 +209,15 @@ final class GameViewModel {
         
         score = repository.score
     }
-
     
-    func saveHighScore(playerName: String) {
-        guard isHighScoreCandidate, !hasSavedHighScore else { return }
-        let trimmedName = playerName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let name = trimmedName.isEmpty ? "Player" : trimmedName
+    func refreshInstruction() {
+        let kinds = activeEntities.compactMap { $0.components[ShapeComponent.self]?.kind }
+        let uniqueKinds = Array(Set(kinds))
         
-        leaderboardRepository.saveScore(score, playerName: name)
-        leaderboardEntries = leaderboardRepository.getTopScores()
-        hasSavedHighScore = true
+        currentInstruction = generateInstruction.execute(availableKinds: uniqueKinds)
+        instructionTimer = currentInstruction?.timeLimit ?? 10
     }
 
-    
     //make entity Stunned
     func handleShoot(entity: Entity) {
         guard var stateComp = entity.components[EntityStateComponent.self] else { return }
@@ -231,74 +274,6 @@ final class GameViewModel {
         var stateComp = entity.components[EntityStateComponent.self] ?? EntityStateComponent()
         stateComp.state = .connected
         entity.components[EntityStateComponent.self] = stateComp
-    }
-    
-    func spawnEntity(in content: RealityViewContent) {
-        guard activeEntities.count < maxEntitiesCount else {
-            print("[Spawning] Maximum character limit reached (\(maxEntitiesCount)). Skipping spawn.")
-            return
-        }
-        
-        let kind = ShapeKind.allCases.randomElement()!
-        
-        let entity: Entity
-        if let template = shapeTemplates[kind] {
-            entity = template.clone(recursive: true)
-            
-            let bounds = entity.visualBounds(relativeTo: entity)
-            let extents = bounds.extents
-            let center = bounds.center
-            
-            let boxShape = ShapeResource.generateBox(width: extents.x, height: extents.y, depth: extents.z)
-                .offsetBy(translation: center)
-            entity.components.set(CollisionComponent(shapes: [boxShape]))
-        } else {
-            let mesh = kind.meshResource
-            let color = colorFor(kind)
-            let material = SimpleMaterial(color: color, isMetallic: true)
-            let modelEntity = ModelEntity(mesh: mesh, materials: [material])
-            modelEntity.generateCollisionShapes(recursive: false)
-            entity = modelEntity
-        }
-        
-        entity.components.set(InputTargetComponent())
-        
-        //Spawn Distance
-        let x = Float.random(in: -1.2...1.2)
-        let y = Float.random(in: 0.4...0.8)
-        let z = Float.random(in: -1.8 ... -1.0)
-        entity.position = SIMD3(x, y, z)
-        
-        let physicsBody = PhysicsBodyComponent(
-            massProperties: .init(mass: 0.1),
-            material: .default,
-            mode: .dynamic
-        )
-        entity.components.set(physicsBody)
-        
-        if let animation = entity.availableAnimations.first {
-            entity.playAnimation(animation.repeat(duration: .infinity), transitionDuration: 0.5)
-        }
-        
-        entity.components[ShapeComponent.self] = ShapeComponent(kind: kind)
-        entity.components[EntityStateComponent.self] = EntityStateComponent()
-        
-        activeEntities.append(entity)
-        //spawn to ECS
-        content.add(entity)
-    }
-    
-    func spawnEntity() {
-        guard let content = self.content else { return }
-        spawnEntity(in: content)
-    }
-    
-    private func colorFor(_ kind: ShapeKind) -> UIColor {
-        switch kind {
-        case .sphere:  return .systemRed
-        case .cube:    return .systemBlue
-        case .pyramid: return .systemGreen
-        }
     }
     
     func setCanvas(_ canvas: Entity) {
@@ -425,45 +400,16 @@ final class GameViewModel {
         }
     }
     
+    private func colorFor(_ kind: ShapeKind) -> UIColor {
+        switch kind {
+        case .sphere:  return .systemRed
+        case .cube:    return .systemBlue
+        case .pyramid: return .systemGreen
+        }
+    }
+    
     private func setColor(_ color: UIColor, on entity: Entity) {
         entity.setStatusIndicator(color: color)
-    }
-    
-    func startCountdown() {
-        gameState = .countdown(3)
-        
-        Task {
-            try? await Task.sleep(nanoseconds: 1_000_000_000)
-            if case .countdown(3) = gameState {
-                gameState = .countdown(2)
-            } else { return }
-            
-            try? await Task.sleep(nanoseconds: 1_000_000_000)
-            if case .countdown(2) = gameState {
-                gameState = .countdown(1)
-            } else { return }
-            
-            try? await Task.sleep(nanoseconds: 1_000_000_000)
-            if case .countdown(1) = gameState {
-                startGamePlay()
-            }
-        }
-    }
-    
-    private func startGamePlay() {
-        clearPlayingEntities()
-        gameState = .playing
-        gameTimeLeft = 50.0
-        spawnAccumulator = 0.0
-        repository.resetScore()
-        score = 0
-        
-        // Spawn initial 10 entities
-        for _ in 0..<10 {
-            spawnEntity()
-        }
-        
-        refreshInstruction()
     }
     
     func clearPlayingEntities() {
@@ -502,6 +448,16 @@ final class GameViewModel {
             }
         }
         firstSelectedEntity = nil
+    }
+    
+    func saveHighScore(playerName: String) {
+        guard isHighScoreCandidate, !hasSavedHighScore else { return }
+        let trimmedName = playerName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let name = trimmedName.isEmpty ? "Player" : trimmedName
+        
+        leaderboardRepository.saveScore(score, playerName: name)
+        leaderboardEntries = leaderboardRepository.getTopScores()
+        hasSavedHighScore = true
     }
     
     func exitToMenu() {
